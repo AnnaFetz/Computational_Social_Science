@@ -1,0 +1,272 @@
+---
+title: "Computational Social Science Project"
+author: "Anna Maria Fetz"
+date: "4 11 2021"
+output: html_document
+---
+RESEARCH QUESTIONS: Does politics influence the rate of sexual harassment in a country, does it have cultural links as well? To what extent does personal heritage have an impact on harassment perception? 
+```{r setup, include=FALSE}
+# Countries
+countries <- c("Austria","Belgium","Bulgaria","Cyprus","CzechRep","Deutschland",
+               "Denmark","Spain","Estonia","Finland","France","Greece","Croatia","Hungary",
+               "Ireland","Italy","Lithuania","Luxembourg","Latvia","Malta","Netherlands",
+               "Poland","Portugal",
+               "Romania","Slovakia","Slovenia","Sweden")
+
+
+# MY DATASETS
+
+#Women agreeing to violence coming from husbands 
+
+women_agreeing_to_violence <- read.csv('attitude_towards_violence_percentage_women_agreement.csv')
+women_agreeing_to_violence <- women_agreeing_to_violence [,c(1,7)]
+women_agreeing_to_violence <- women_agreeing_to_violence[order(women_agreeing_to_violence$ï..LOCATION),]
+women_agreeing_to_violence$ï..LOCATION <- countries
+
+#Women marrying 15-19
+child_marriage <- read.csv('child_marriage_percentage_15_19.csv')
+child_marriage <- child_marriage[,c(1,7)]
+child_marriage <- child_marriage[order(child_marriage$ï..LOCATION),]
+child_marriage$ï..LOCATION <- countries
+
+#Percentage of women having experienced violence multiple times
+violence_over_lifetime_women <- read.csv('prevalence_of_violence_lifetime_percentage.csv')
+violence_over_lifetime_women <- violence_over_lifetime_women[,c(1,7)]
+violence_over_lifetime_women <- violence_over_lifetime_women[order(violence_over_lifetime_women$ï..LOCATION),]
+violence_over_lifetime_women$ï..LOCATION <- countries
+
+#Index - presence of laws against domestic violence 0-1
+laws_on_domestic_violence <- read.csv('laws_on_domestic_violence_percentage.csv')
+laws_on_domestic_violence <- laws_on_domestic_violence[,c(1,7)]
+laws_on_domestic_violence <- laws_on_domestic_violence[order(laws_on_domestic_violence$ï..LOCATION),]
+laws_on_domestic_violence$ï..LOCATION <- countries
+
+#Female representation in politics
+womens_in_politics_parlament <- read.csv('women_in_politics_percentage_of_women_parlamentarians_EU.csv')
+womens_in_politics_parlament <- womens_in_politics_parlament[,c(1,7)]
+womens_in_politics_parlament  <- womens_in_politics_parlament [order(womens_in_politics_parlament$ï..LOCATION),]
+womens_in_politics_parlament$ï..LOCATION <- countries
+
+#Problem recognition - not enough data
+share_people_believe_harassment_third_problem_issue <- read.csv2('Share_PPL_EU_who_ believe_sexual harassment_top_three_issues_facing_women_in their_country.csv', header = F)
+share_people_believe_harassment_third_problem_issue <- share_people_believe_harassment_third_problem_issue[c(1:27),c(1,2)]
+share_people_believe_harassment_third_problem_issue$V1 <- countries
+colnames(share_people_believe_harassment_third_problem_issue) <- c('ï..LOCATION', 'PC')
+
+#Discriminatory family insitutions 
+index_gender_family_discrimination <- read.csv('INDEX_social_institutions_and_gender_family_discrimination.csv')
+index_gender_family_discrimination <- index_gender_family_discrimination[order(index_gender_family_discrimination$ï..LOCATION),]
+index_gender_family_discrimination <- index_gender_family_discrimination[,c(1,7)]
+index_gender_family_discrimination$ï..LOCATION <-countries
+
+#Restricted civili liberties according to gender
+index_gender_restricted_civil_liberties <- read.csv('INDEX_social_institutions_and_gender_restricted_civil_liberties.csv')
+index_gender_restricted_civil_liberties <- index_gender_restricted_civil_liberties[order(index_gender_restricted_civil_liberties$ï..LOCATION),]
+index_gender_restricted_civil_liberties <- index_gender_restricted_civil_liberties[,c(1,7)]
+index_gender_restricted_civil_liberties$ï..LOCATION <- countries
+
+#Pay gap (brutto, raw difference per age and sex)
+pay_gap <- read.csv('pay_gap_gender.csv', sep=';')
+pay_gap <-pay_gap[-28,]
+
+#Percentage of male abusers 
+gender <- read.csv('gender_abuse.csv', sep = ';')
+
+#Rape Rate per Country 
+rape_rate_per_country <- read.csv2('csvData.csv', sep=',')
+rape_rate_per_country <-rape_rate_per_country[order(rape_rate_per_country$ï..country),]
+rape_rate_per_country <- rape_rate_per_country[,2]
+#Education Level under lower secondary 
+edu_level <-read.csv('EduLevel2.txt', sep=',')[,3]
+
+
+df <- cbind(women_agreeing_to_violence, womens_in_politics_parlament, share_people_believe_harassment_third_problem_issue, index_gender_family_discrimination, index_gender_restricted_civil_liberties, laws_on_domestic_violence, violence_over_lifetime_women, child_marriage)[,-c(3,5,7,9,11,13,15)]
+
+colnames(df) <- c('country',"women_agreeing", "women_in_parlament", "share_harassment_issue", "idx_gender_familydisc", "idx_gender_restriced_civlib", "laws_domviol", 'violence_lifetime', 'child_marriage')  
+
+df$pay_gap <- pay_gap$UDJ_earnings_gap
+df$gender_abuser <- gender$pc_male_perpetrator
+df$rape_rate <- as.numeric(rape_rate_per_country)
+df$EduLevel <- as.numeric(edu_level)
+```
+
+```{r}
+# PAIRS PLOT
+pairs(df[,-c(1,4)])
+```
+No consistent correlation can be found besides for:
+- Women agreeing to violence and rape rate -> The more this happens, the more tolerant one gets.
+- Women in parliament and abuser gender 
+- Violence over lifetime and rape rate 
+- Gender and rape rate 
+
+These results mirror what literature says regarding tolerance of people that have been abused multiple times or at least one in their life. Moreover, we notice the influence that gender has on the abuse itself. 
+
+```{r}
+corr <- cor(df[,-c(1,4)], method = "pearson")
+corrplot::corrplot(corr, method = 'color', type = 'lower')
+corrplot::corrplot(corr, )
+```
+
+What emerges from the corrplot is some strong correlation for : 
+1. Women in parliament and restricted civil liberties 
+2. Women in parliament and family discrimination 
+3. Rape rate and women in parliament 
+
+```{r}
+library(leaps)
+set.seed(1234)
+best_model <- regsubsets(df$rape_rate ~ ., data = df[,-c(1,4)], nvmax =7) 
+summary(best_model)
+```
+Women in parliament, idx of discrimination within family, pay gap and laws against domestic violence are predictors that are always considered being drivers for SH, and here more specifically rape rate. 
+```{r}
+op <- par(mfrow=c(1,2)) 
+plot(summary(best_model)$rss, xlab="Number of Variables", ylab="RSS", type="l")
+plot(summary(best_model)$adjr2, xlab="Number of Variables", ylab="Adjusted RSq", type="l")
+```
+
+```{r}
+set.seed(1234)
+lm <- lm(df$rape_rate ~  women_in_parlament + laws_domviol + pay_gap + idx_gender_restriced_civlib+ gender_abuser, data = df)
+summary(lm)
+```
+However, we notice that only laws on domestic violence and political representation play a significant role. It is interesting to notice that women in parlament has POSITIVE sign, while laws against domestic violence a negative one. This clearly suggests that : 
+
+1. Women in higher positions might tend to recognize abuse more and thus report it more often. 
+2. The more the laws against SH, the lower SH rate. 
+```{r}
+#Due to Sweden's different regulations we remove it 
+df_new <- df[df$country != 'Sweden',]
+best_model2 <- regsubsets(df_new$rape_rate ~ . , data = df_new[,-c(1,4)], nvmax = 12) 
+summary(best_model2)
+```
+
+
+```{r pressure, echo=FALSE}
+op <- par(mfrow=c(1,2)) 
+plot(summary(best_model2)$rss, xlab="Number of Variables", ylab="RSS", type="l")
+plot(summary(best_model2)$adjr2, xlab="Number of Variables", ylab="Adjusted RSq", type="l")
+```
+
+
+```{r}
+set.seed(1234)
+lm2 <- lm(df_new$rape_rate ~ women_in_parlament + pay_gap, data = df_new)
+
+#lm2 <- lm(df_new$rape_rate ~ women_in_parlament + laws_domviol + pay_gap + idx_gender_restriced_civlib+ gender_abuser, data = df_new)
+summary(lm2)
+
+```
+We notice that laws on domestic violence get less explanatory power without Sweden, thus demonstrating the huge impact they can have. 
+
+```{r}
+## GENERIC LM
+set.seed(56)
+d2 <- df
+d2$country <- as.factor(d2$country)
+lm3 <- lm(df$rape_rate ~ ., data = df[,-c(1,4)])
+summary(lm3)
+```
+
+################## QUESTIONNAIRE ################## 
+
+```{r}
+questionnaire <- read.csv2('questionnaire_perception_csv.csv')
+questionnaire <- questionnaire[,-1]
+
+colnames(questionnaire) <- c('age', 'gender', 'country', 'at_least_once_harassed','how_harassed','places_avoidance','seek_help','personal_perception_recurrency', 'perception_perceived_issue', 'other')
+
+questionnaire$at_least_once_harassed <- ifelse(questionnaire$at_least_once_harassed == 'No', 'No', 'Yes')
+questionnaire$places_avoidance <- ifelse(questionnaire$places_avoidance == 'No', 'No', 'Yes')
+questionnaire$seek_help <- ifelse(questionnaire$seek_help == 'No', 'No', 'Yes')
+
+summary(questionnaire[,-10])
+```
+```{r}
+
+questionnaire$seek_help <- as.factor(questionnaire$seek_help)
+questionnaire$at_least_once_harassed <- as.factor(questionnaire$at_least_once_harassed)
+questionnaire$places_avoidance <- as.factor(questionnaire$places_avoidance)
+questionnaire$gender <- as.factor(questionnaire$gender)
+levels(questionnaire$gender)
+par(mfrow=c(2,2))
+hist(questionnaire[questionnaire$gender == 'M',]$personal_perception_recurrency, col = 'gold', main = 'Males recurrency perception', xlab = '')
+hist(questionnaire[questionnaire$gender == 'F',]$personal_perception_recurrency, col = 'salmon', main = 'Females recurrency perception', xlab = '' )
+hist(questionnaire[questionnaire$gender == 'M',]$perception_perceived_issue, col = 'gold', main = 'Males perception perceived issue', xlab = '')
+hist(questionnaire[questionnaire$gender == 'F',]$perception_perceived_issue, col = 'salmon', main = 'Females perception perceived issue', xlab = '' )
+
+
+
+#corr2 <- cor(questionnaire[,-10], method = "pearson")
+#corrplot::corrplot(corr2, method = 'number', type = 'lower')
+```
+From a basic histogram, it can already be noticed how sex impacts abuse perception: females tend to perceive the the general perception of sexual abuses issues of any type of about 3/10 from the general public, while personally considering 8/10 times as a relevant issue. On the Other hand, men observe the issue and tend to project it on the general public with always a mean of about 5.
+```{r}
+summary(questionnaire)
+mean_perception_males <- mean(questionnaire[questionnaire$gender == 'M',]$perception_perceived_issue)
+mean_perception_females <- mean(questionnaire[questionnaire$gender == 'F',]$perception_perceived_issue)
+mean_recurrency_males <- mean(questionnaire[questionnaire$gender == 'M',]$personal_perception_recurrency)
+mean_recurrency_females <- mean(questionnaire[questionnaire$gender == 'F',]$personal_perception_recurrency)
+
+tab <- matrix(rep(2, times=4), ncol=2, byrow=TRUE)
+colnames(tab) <- c('Perception','Recurrency')
+rownames(tab) <- c('F', 'M')
+
+tab['F','Perception'] <- mean_perception_females
+tab['M','Perception'] <- mean_perception_males
+tab['F','Recurrency'] <- mean_recurrency_females
+tab['M','Recurrency'] <- mean_recurrency_males
+tab
+```
+
+The table above actually helps to understand whether sex has an impact on the perceived issue, and whether being male or female impacts most on being abused, which we know from literature (we may know that almost 97% of abusers are men and 91% of victims are women). This may also explains why perception gap is so wide. 
+```{r}
+library(poLCA)
+```
+```{r}
+set.seed(1234)
+attach(questionnaire)
+f <- cbind(seek_help, places_avoidance, gender)~1 # Only generic
+gss.lc2 <- poLCA(f,questionnaire,nclass=2, graphs = TRUE)
+
+```
+```{r}
+set.seed(1234)
+attach(questionnaire)
+f <- cbind(seek_help, places_avoidance, personal_perception_recurrency, perception_perceived_issue, gender)~1
+gss.lc2 <- poLCA(f,questionnaire,nclass=2, graphs = TRUE)
+```
+
+```{r}
+set.seed(1234)
+attach(questionnaire)
+f <- cbind(seek_help, places_avoidance, personal_perception_recurrency, perception_perceived_issue, gender, at_least_once_harassed)~1
+levels(questionnaire$gender)
+levels(questionnaire$at_least_once_harassed)
+gss.lc2 <- poLCA(f,questionnaire,nclass=2, graphs = TRUE)
+
+```
+Here we have two classes, to which 57% and 43% share of the population belong, respectively, to class 1 and to class 2, which manifest very different behaviors. 
+Firstly, class 1. We know from "levels" that females -> 1 and males ->2, while other -> 3. 
+Thus, the first thing that pops out is the disproportion in between male and female respondents. Namely, class 2 (Males is higher than) displays 65% of males against 35% females. This group of respondents is less prone to seek help (no -> 1, yes -> 2) and seems indifferent when having to avoid places. Most probably, only socially-considered dangerous places are avoided. What is interesting is to observe the distribution scale of both personal perception of the issue, and perception of the social perception. Distribution is more or less event, not showing very strong peaks anywhere. Thus, this group seems indifferent to the issue. The second class presents almost 96% of women, not prone to seek help and basically always avoiding certain places. Interestingly enough, both scales of perception follow opposite patterns, meaning that personal perception is considered high on the overall, but social perception is conceived as very low
+```{r}
+gss.lc3 <- poLCA(f,questionnaire,nclass=3, graphs = TRUE)
+levels(questionnaire$seek_help)
+```
+Although the CHI squared is way lower, we may notice the AIC and BIC to smaller than the previous ones, yet grasping some additional information than the first trial. 
+Namely, the first class is the same as the previous class 1. However, distribution changes for the last two. We see that class 3 is mainly composed by men, not seeking for help but also stating that the issue is neither perceived nor seen as relevant both personally and in society. Just one outlier seems to emerge. 
+```{r}
+gss.lc4 <- poLCA(f,questionnaire,nclass=4, graphs = TRUE)
+
+```
+Due to the very higher AIC and BIC, a 4-classed solution does not look ideal. 
+
+
+A very first generic guess would have been to identify 4 main classes: females that have been harassed perceiving it as a major issue, female that have never been harassed but perceive it as an issue, males that perceive it as a major issue, males that do not perceive it as an issue. However, it appears that assuming the existence of 2 classes (which do **not** correspond to the gender) leads to the best result, which a very high chi square.
+
+
+```{r}
+levels(questionnaire$gender)
+```
+On the other hand, there is a specific group of females-only respondents (and other) , characterizing 42% of total population 
